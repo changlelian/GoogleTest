@@ -1,116 +1,163 @@
 #include <iostream>
 #include "gtest/gtest.h"
-#include "MechEyeApi.h"
+#include "Camera.h"
 
-//********************************** Error Code Test *********************************************
-TEST(ErrorCodeTest, errorcode)
-{
-    int a = 0;
-    //using ErrCode = mmind::api::ErrorStatus::ErrorCode;
-
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_SUCCESS, 0);
-    EXPECT_EQ(a, 0);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_DEVICE_OFFLINE, -2);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_FIRMWARE_NOT_SUPPORTED, -3);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_PARAMETER_SET_ERROR, -4);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_PARAMETER_GET_ERROR, -5);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_CAPTURE_NO_FRAME, -6);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_INVALID_INPUT_FRAME, -7);
-    //EXPECT_EQ(ErrCode::MMIND_STATUS_INVALID_INTRINSICS_PARAMETER, -8);
+void showErrorMessage(mmind::eye::ErrorStatus& status ) {
+    if (status.isOK())
+        return;
+    std::cout << "Error Code : " << status.errorCode << ", Error Description: " << status.errorDescription << std::endl;
 }
 
-//************************************ Error Description Test *******************************************
-TEST(ErrorCodeTest, errorstatus)
-{
-    using ErrStatus = mmind::api::ErrorStatus;
-    const std::string description = "test description";
+// 定义整体测试夹具
+class TestFixture : public::testing::Test {
 
-    mmind::api::ErrorStatus status_err = ErrStatus::ErrorStatus(mmind::api::ErrorStatus::MMIND_STATUS_CAPTURE_NO_FRAME, description);
-    mmind::api::ErrorStatus status_ok = ErrStatus::ErrorStatus(mmind::api::ErrorStatus::MMIND_STATUS_SUCCESS, description);
+protected: 
+    mmind::eye::Camera device;
+    mmind::eye::SettingGroup* groupSet = nullptr;
+    mmind::eye::ParameterArray* parameters = nullptr;
 
-    EXPECT_EQ(status_err.errorCode, -6);
-    EXPECT_EQ(status_ok.errorCode, 0);
+    void SetUp() override {
+        mmind::eye::ErrorStatus status = device.connect("192.168.20.221", 5577, 30000);            // 创建链接设备
+        if (!status.isOK())
+            std::cout << "Error Code : " << status.errorCode << ", Error Description: " << status.errorDescription << std::endl;
+            std::abort(); 
 
-    EXPECT_EQ(status_err.errorDescription, description);
+        groupSet = device.settings();
+        groupSet->setAsCurrentSetting("default");
+        parameters = groupSet->getCurrentSetting();
+    }
 
-    EXPECT_FALSE(status_err.isOK());
-    EXPECT_TRUE(status_ok.isOK());
+    void TearDown() override {
+        device.disConnect();
+        std::cout << "Release Source !" << std::endl;
+    }
+};
+
+
+
+//  测试项：Scan3DGain 
+TEST_F(TestFixture, TestScan3DGain) {
+    double getValue;
+    std::string paramName = "Scan3DGain";
+
+    for (int i = 0; i <= 160; i++) {
+        double setValue = i / 10.0;
+        parameters->setFloatValue(paramName, setValue);
+        parameters->getFloatValue(paramName, getValue);
+
+        getValue = round(getValue * 10.0) / 10.0;  
+
+        ASSERT_EQ(setValue, getValue);
+    }
+}
+
+//  测试项：[2D参数] Timed-Scan2DSharpenFactor 
+TEST_F(TestFixture, TestScan2DSharpenFactor) {
+    std::string paramName = "Scan2DSharpenFactor";
+
+    for (int i = 0; i <= 50; i++) {
+        double getValue;
+        double setValue = i / 10.0;
+        parameters->setFloatValue(paramName, setValue);
+        parameters->getFloatValue(paramName, getValue);
+
+        getValue = round(getValue * 10.0) / 10.0;
+
+        ASSERT_EQ(setValue, getValue);
+    }
+}
+
+/*
+//  [待完善] 测试项：[2D参数] Timed-Scan2DExposureTime
+TEST_F(TestFixture, TestScanExposureTime) {
+    // TODO
+    std::string paramName = "Scan2DExposureTime";
+    double getValue;
+    parameters->setFloatValue(paramName, 4);
+    parameters->getFloatValue(paramName, getValue);
+
+    ASSERT_EQ(4, getValue);
 
 }
-//
-////************************************** Device Test *****************************************
-TEST(DeviceInvalid, dinvalid)
-{
-    // Normal device test
-    mmind::api::MechEyeDevice device;
-    auto stuCon = device.connect("192.168.20.125");
-    EXPECT_EQ(stuCon.errorCode, 0);
-    //EXPECT_EQ(stuCon.errorDescription, "");
 
-    //auto stuErCon = device.connect("111.111.111.111");
-    //EXPECT_EQ(stuErCon.errorCode, -1);
-    //EXPECT_EQ(stuErCon.errorDescription, "Failed to connect to the Mech-Eye Industrial 3D Camera. Please check the network connection.");
+
+//  [待完善] 测试项：[2D参数] Auto-Scan2DExpectedGrayValue
+TEST_F(TestFixture, TestScan2DExpectedGrayValue) {
+    int getValue;
+    std::string paramName = "Scan2DExpectedGrayValue";
+
+    for (int setValue = 0; setValue <= 255; ++setValue) {
+        // double setValue = i / 10.0;
+        parameters->setIntValue(paramName, setValue);
+        parameters->getIntValue(paramName, getValue);
+        std::cout << setValue << "       " << getValue << std::endl;
+        // getValue = round(getValue * 10.0) / 10.0;
+
+        ASSERT_EQ(setValue, getValue);
+    }
 }
+*/
 
-////************************************** Mode Test *****************************************
-//
-//class ModelTest : public ::testing::TestWithParam<mmind::api::Scanning2DSettings::Scan2DExposureMode> 
-//{
-//public:
-//    void SetUp() override 
-//    {
-//        auto stuCon = device.connect("192.168.20.232");
-//    }
-//
-//    mmind::api::MechEyeDevice device;
-//    mmind::api::Scanning2DSettings::Scan2DExposureMode mode;
-//};
-//
-//
-//TEST_P(ModelTest, modetest)
-//{
-//    auto setstatus = device.setScan2DExposureMode(GetParam());
-//    auto getstatus = device.getScan2DExposureMode(mode);
-//    EXPECT_EQ(GetParam(), mode);
-//    EXPECT_EQ(setstatus.errorCode, 0);
-//    EXPECT_EQ(getstatus.errorCode, 0);
-//
-//}
-//
-//INSTANTIATE_TEST_SUITE_P(SET2DEXPMODE, ModelTest, ::testing::Values(mmind::api::Scanning2DSettings::Scan2DExposureMode::Auto,
-//                                                                    mmind::api::Scanning2DSettings::Scan2DExposureMode::Flash,
-//                                                                    mmind::api::Scanning2DSettings::Scan2DExposureMode::HDR
-//                                                                    )
-//                        );
-//
-////************************************** ExposureTime Test *****************************************
-//
-//class Exposure3D2DTest : public ::testing::TestWithParam<std::vector<double>>
-//{
-//public:
-//    void SetUp() override
-//    {
-//        auto stuCon = device.connect("192.168.20.232");
-//    }
-//
-//    mmind::api::MechEyeDevice device;
-//    std::vector<double> exposure;
-//
-//};
-//
-//TEST_P(Exposure3D2DTest, modetest)
-//{
-//    auto setstatus = device.setScan3DExposure(GetParam());
-//    auto getstatus = device.getScan3DExposure(exposure);
-//
-//    EXPECT_EQ(GetParam(), exposure);
-//    EXPECT_EQ(setstatus.errorCode, 0);
-//    EXPECT_EQ(getstatus.errorCode, 0);
-//}
-//
-//std::vector<double> aaa{ 4, 4, 4 };
-//std::vector<double> bbb{ 1,1,1 };
-//INSTANTIATE_TEST_SUITE_P(EXPOSURE, Exposure3D2DTest, ::testing::Values(aaa, bbb));
+// 定义点云模式测试夹具
+class PointCloutTestFixture : public TestFixture, public ::testing::WithParamInterface<int> {
+protected:
+    void SetUp() override {
+        TestFixture::SetUp();
+        int enumValue = GetParam();
+        parameters->setEnumValue("PointCloudOutlierRemoval", enumValue);
+        //parameters->setEnumValue("PointCloudSurfaceSmoothing", enumValue);
+        parameters->setEnumValue("PointCloudNoiseRemoval", enumValue);
+        parameters->setEnumValue("PointCloudEdgePreservation", enumValue);
+
+    }
+};
+
+// 测试项：点云模式测试
+TEST_P(PointCloutTestFixture, TestPointCloudMode) {
+    int OutlierRemovalValue, SurfaceSmoothingValue, NoiseRemovalValue, EdgePreservation;
+
+    parameters->getEnumValue("PointCloudOutlierRemoval", OutlierRemovalValue);
+    ASSERT_EQ(GetParam(), OutlierRemovalValue);
+
+    //parameters->getEnumValue("PointCloudSurfaceSmoothing", SurfaceSmoothingValue);
+    //ASSERT_EQ(GetParam(), SurfaceSmoothingValue);
+
+    parameters->getEnumValue("PointCloudNoiseRemoval", NoiseRemovalValue);
+    ASSERT_EQ(GetParam(), NoiseRemovalValue);
+
+    if (GetParam() < 3) {
+        parameters->getEnumValue("PointCloudEdgePreservation", EdgePreservation);
+        ASSERT_EQ(GetParam(), EdgePreservation);
+    }
+    
+}
+INSTANTIATE_TEST_SUITE_P(PointCloutModes, PointCloutTestFixture, ::testing::Values(0, 1, 2, 3));
+
+
+// 定义点云条纹对比阈值与投影亮度测试夹具
+class PointCloutFringeXXXThresholdTestFixture : public TestFixture, public ::testing::WithParamInterface<int> {
+protected:
+    void SetUp() override {
+        TestFixture::SetUp();
+        int setValue = GetParam();
+        parameters->setIntValue("FringeContrastThreshold", setValue);
+        parameters->setIntValue("FringeMinThreshold", setValue);
+    }
+};
+
+
+//测试项：点云FringeThreshold测试
+TEST_P(PointCloutFringeXXXThresholdTestFixture, TestFringeThreshold) {
+    int FringeContrastThresholdValue, FringeMinThresholdValue;
+    parameters->getEnumValue("FringeContrastThreshold", FringeContrastThresholdValue);
+    ASSERT_EQ(GetParam(), FringeContrastThresholdValue);
+
+    parameters->getEnumValue("FringeMinThreshold", FringeMinThresholdValue);
+    ASSERT_EQ(GetParam(), FringeMinThresholdValue);
+
+}
+INSTANTIATE_TEST_SUITE_P(ThresholdTestFixture, PointCloutFringeXXXThresholdTestFixture, ::testing::Range(1, 101, 10));
+
 
 int main(int argc, char** argv)
 {
